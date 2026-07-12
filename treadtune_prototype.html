@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>TREADTUNE — Automated Tread Pattern Tuning</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0A0C0F;
+    --panel:#12161B;
+    --panel-2:#171C22;
+    --border:#252C34;
+    --border-soft:#1B2128;
+    --text:#E7EAEE;
+    --text-dim:#8A94A0;
+    --text-faint:#525C67;
+    --land:#CDC5DE;
+    --land-dim:#9891AC;
+    --sea:#040609;
+    --cyan:#4FD8E0;
+    --purple:#9184EE;
+    --ok:#39D98A;
+    --warn:#F4B740;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{background:var(--bg); color:var(--text); font-family:'Inter',sans-serif; height:100%;}
+  body{
+    background-image:
+      linear-gradient(var(--border-soft) 1px, transparent 1px),
+      linear-gradient(90deg, var(--border-soft) 1px, transparent 1px);
+    background-size: 28px 28px;
+    background-position: -1px -1px;
+  }
+  .mono{font-family:'IBM Plex Mono',monospace;}
+  .display{font-family:'Space Grotesk',sans-serif;}
+
+  .app{max-width:1400px; margin:0 auto; padding:28px 28px 60px;}
+
+  header.top{display:flex; align-items:flex-end; justify-content:space-between; margin-bottom:26px; padding-bottom:18px; border-bottom:1px solid var(--border);}
+  .brandmark{display:flex; align-items:center; gap:12px;}
+  .brandmark .glyph{width:38px; height:38px; border-radius:8px; background:linear-gradient(135deg, var(--purple), var(--cyan)); display:flex; align-items:center; justify-content:center; font-family:'Space Grotesk'; font-weight:700; color:#08090b; font-size:15px;}
+  .brandmark h1{font-family:'Space Grotesk'; font-weight:700; font-size:19px; letter-spacing:0.02em;}
+  .brandmark .sub{color:var(--text-dim); font-size:11.5px; margin-top:2px; letter-spacing:0.03em;}
+  .top-right{text-align:right;}
+  .top-right .tag{font-size:10.5px; color:var(--text-faint); letter-spacing:0.12em; text-transform:uppercase;}
+  .top-right .proj{font-size:12.5px; color:var(--text-dim); margin-top:3px;}
+
+  .layout{display:grid; grid-template-columns:340px 1fr; gap:22px; align-items:start;}
+  @media (max-width:980px){ .layout{grid-template-columns:1fr;} }
+
+  .stepper{display:flex; flex-direction:column; gap:0;}
+  .step{
+    background:var(--panel); border:1px solid var(--border); border-radius:10px;
+    margin-bottom:10px; overflow:hidden; transition:border-color .2s;
+  }
+  .step.active{border-color:var(--purple); box-shadow:0 0 0 1px rgba(145,132,238,0.25);}
+  .step.done .step-num{background:rgba(57,217,138,0.14); color:var(--ok); border-color:rgba(57,217,138,0.4);}
+  .step-head{display:flex; align-items:center; gap:11px; padding:12px 14px; cursor:pointer; user-select:none;}
+  .step-num{
+    width:24px; height:24px; border-radius:6px; border:1px solid var(--border);
+    display:flex; align-items:center; justify-content:center; font-family:'IBM Plex Mono';
+    font-size:11px; color:var(--text-dim); flex-shrink:0;
+  }
+  .step.active .step-num{background:rgba(145,132,238,0.16); color:var(--purple); border-color:rgba(145,132,238,0.45);}
+  .step-title{font-size:13px; font-weight:600; letter-spacing:0.01em; flex:1;}
+  .step-title .stage{display:block; font-size:9.5px; color:var(--text-faint); text-transform:uppercase; letter-spacing:0.1em; font-weight:500; margin-bottom:2px;}
+  .chevron{color:var(--text-faint); font-size:11px; transition:transform .2s;}
+  .step.active .chevron{transform:rotate(90deg); color:var(--purple);}
+  .step-body{max-height:0; overflow:hidden; transition:max-height .25s ease;}
+  .step.active .step-body{max-height:600px;}
+  .step-body-inner{padding:2px 14px 16px;}
+
+  label.field{display:block; font-size:10.5px; color:var(--text-dim); margin-bottom:6px; text-transform:uppercase; letter-spacing:0.06em;}
+  .row{display:flex; gap:10px; align-items:center; margin-bottom:12px;}
+  .row:last-child{margin-bottom:0;}
+  .val-badge{font-family:'IBM Plex Mono'; font-size:12px; color:var(--cyan); background:var(--panel-2); border:1px solid var(--border); padding:3px 8px; border-radius:5px; min-width:52px; text-align:center;}
+
+  input[type=range]{
+    -webkit-appearance:none; flex:1; height:4px; background:var(--border); border-radius:2px; outline:none;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none; width:14px; height:14px; border-radius:50%;
+    background:var(--purple); border:2px solid #0A0C0F; cursor:pointer; box-shadow:0 0 0 1px var(--purple);
+  }
+  input[type=number], select{
+    background:var(--panel-2); border:1px solid var(--border); color:var(--text); border-radius:6px;
+    padding:7px 9px; font-family:'IBM Plex Mono'; font-size:12.5px; width:100%; outline:none;
+  }
+  select{cursor:pointer;}
+  input[type=number]:focus, select:focus{border-color:var(--purple);}
+
+  .btn{
+    background:var(--panel-2); border:1px solid var(--border); color:var(--text);
+    padding:9px 14px; border-radius:7px; font-family:'IBM Plex Mono'; font-size:11.5px;
+    cursor:pointer; transition:all .15s; letter-spacing:0.02em; width:100%; text-align:center;
+  }
+  .btn:hover{border-color:var(--text-dim);}
+  .btn.primary{background:linear-gradient(135deg, var(--purple), #7A6DE0); border:none; color:#08090b; font-weight:600;}
+  .btn.primary:hover{filter:brightness(1.08);}
+  .btn.primary:disabled{background:var(--panel-2); color:var(--text-faint); cursor:not-allowed; filter:none;}
+  .btn.ghost{background:transparent;}
+  .btn-row{display:flex; gap:8px;}
+
+  .dropzone{
+    border:1.5px dashed var(--border); border-radius:8px; padding:16px; text-align:center;
+    cursor:pointer; transition:border-color .2s; font-size:11.5px; color:var(--text-dim);
+  }
+  .dropzone:hover{border-color:var(--purple); color:var(--text);}
+  .dropzone.has-file{border-style:solid; border-color:var(--ok); color:var(--ok);}
+  .dropzone svg{display:block; margin:0 auto 8px;}
+
+  .status-pill{
+    display:inline-flex; align-items:center; gap:6px; padding:4px 10px; border-radius:20px;
+    font-family:'IBM Plex Mono'; font-size:10.5px; letter-spacing:0.03em;
+  }
+  .status-pill.ok{background:rgba(57,217,138,0.12); color:var(--ok); border:1px solid rgba(57,217,138,0.35);}
+  .status-pill.warn{background:rgba(244,183,64,0.12); color:var(--warn); border:1px solid rgba(244,183,64,0.35);}
+  .dot{width:6px; height:6px; border-radius:50%; background:currentColor;}
+
+  .hint{font-size:11px; color:var(--text-faint); line-height:1.5; margin-top:10px;}
+
+  /* MAIN PANEL */
+  .main{background:var(--panel); border:1px solid var(--border); border-radius:12px; overflow:hidden;}
+  .main-tabs{display:flex; border-bottom:1px solid var(--border); background:var(--panel-2);}
+  .tab{padding:12px 20px; font-size:12px; font-family:'IBM Plex Mono'; color:var(--text-faint); cursor:pointer; border-bottom:2px solid transparent;}
+  .tab.active{color:var(--text); border-bottom-color:var(--cyan);}
+  .main-canvas-wrap{padding:26px; display:flex; flex-direction:column; align-items:center; gap:18px; min-height:420px; justify-content:center;}
+  #patternCanvas{
+    width:100%; max-width:680px; aspect-ratio:300/160; border-radius:6px; border:1px solid var(--border);
+    background:var(--sea); image-rendering:auto;
+  }
+  .view-panel{display:none; width:100%;}
+  .view-panel.show{display:flex; flex-direction:column; align-items:center; gap:18px;}
+
+  .readout-strip{
+    display:grid; grid-template-columns:repeat(4,1fr); border-top:1px solid var(--border); background:var(--panel-2);
+  }
+  .readout{padding:14px 20px; border-right:1px solid var(--border);}
+  .readout:last-child{border-right:none;}
+  .readout .rlabel{font-size:9.5px; text-transform:uppercase; letter-spacing:0.08em; color:var(--text-faint); margin-bottom:5px;}
+  .readout .rval{font-family:'IBM Plex Mono'; font-size:18px; font-weight:600;}
+  .readout .rval.cyan{color:var(--cyan);}
+  .readout .rval.purple{color:var(--purple);}
+  .readout .rval.ok{color:var(--ok);}
+  .readout .rval.warn{color:var(--warn);}
+
+  /* GAUGE */
+  .gauge-wrap{display:flex; align-items:center; gap:16px; margin-top:8px;}
+  .gauge-readings{flex:1;}
+  .gauge-readings .big{font-family:'IBM Plex Mono'; font-size:26px; font-weight:600; color:var(--cyan); line-height:1;}
+  .gauge-readings .lbl{font-size:10px; color:var(--text-faint); text-transform:uppercase; letter-spacing:0.08em; margin-top:4px;}
+
+  #multipitchCanvas{width:100%; border-radius:6px;}
+
+  .legend{display:flex; gap:18px; font-size:11px; color:var(--text-dim);}
+  .legend span{display:inline-flex; align-items:center; gap:6px;}
+  .swatch{width:10px; height:10px; border-radius:2px; display:inline-block;}
+
+  footer.note{margin-top:20px; font-size:10.5px; color:var(--text-faint); line-height:1.6; border-top:1px solid var(--border); padding-top:14px;}
+  footer.note b{color:var(--text-dim);}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header class="top">
+    <div class="brandmark">
+      <div class="glyph">T</div>
+      <div>
+        <h1>TREADTUNE</h1>
+        <div class="sub">Automated Tyre Tread Pattern Tuning — Prototype</div>
+      </div>
+    </div>
+    <div class="top-right">
+      <div class="tag">Pre-Development Prototype</div>
+      <div class="proj mono">Apollo Tyres × Vredestein — FY27</div>
+    </div>
+  </header>
+
+  <div class="layout">
+
+    <!-- ================= LEFT: STEPPER ================= -->
+    <div class="stepper" id="stepper">
+
+      <div class="step active" data-step="1">
+        <div class="step-head" onclick="setActiveStep(1)">
+          <div class="step-num">01</div>
+          <div class="step-title"><span class="stage">Input</span>Tread Pattern Drawing</div>
+          <div class="chevron">▸</div>
+        </div>
+        <div class="step-body">
+          <div class="step-body-inner">
+            <label class="field">CAD Drawing / Bitmap Input</label>
+            <div class="dropzone" id="dropzone" onclick="document.getElementById('fileInput').click()">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg>
+              <span id="dzLabel">Drop tread pattern image, or click to upload</span>
+            </div>
+            <input type="file" id="fileInput" accept="image/*" style="display:none">
+            <div class="hint">Accepts PNG/JPG crops of a tread pattern segment. No file uploaded → a synthetic reference pattern is used. Production tool accepts native <b style="color:var(--text-dim)">.dwg / .dxf</b> CAD input directly.</div>
+            <div class="btn-row" style="margin-top:12px;">
+              <button class="btn" onclick="loadSample()">Use synthetic sample</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step" data-step="2">
+        <div class="step-head" onclick="setActiveStep(2)">
+          <div class="step-num">02</div>
+          <div class="step-title"><span class="stage">Process</span>Pattern Feature Identification</div>
+          <div class="chevron">▸</div>
+        </div>
+        <div class="step-body">
+          <div class="step-body-inner">
+            <label class="field">Land / Sea Detection Threshold</label>
+            <div class="row">
+              <input type="range" id="thresholdSlider" min="20" max="235" value="128">
+              <div class="val-badge" id="thresholdVal">128</div>
+            </div>
+            <div class="hint">Separates rubber <b style="color:var(--land)">land</b> from groove <b style="color:var(--cyan)">sea</b> by pixel luminance. Lower values classify more of the pattern as land.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step" data-step="3">
+        <div class="step-head" onclick="setActiveStep(3)">
+          <div class="step-num">03</div>
+          <div class="step-title"><span class="stage">Analyze</span>Land : Sea Ratio</div>
+          <div class="chevron">▸</div>
+        </div>
+        <div class="step-body">
+          <div class="step-body-inner">
+            <label class="field">Target Void Ratio (Sea %)</label>
+            <div class="row">
+              <input type="number" id="targetVoid" value="32" min="10" max="50" step="0.5">
+              <span class="mono" style="color:var(--text-dim); font-size:12px;">%</span>
+            </div>
+            <label class="field">Tolerance (±)</label>
+            <div class="row">
+              <input type="number" id="tolerance" value="1.5" min="0.5" max="5" step="0.5">
+              <span class="mono" style="color:var(--text-dim); font-size:12px;">%</span>
+            </div>
+            <div id="statusRow"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step" data-step="4">
+        <div class="step-head" onclick="setActiveStep(4)">
+          <div class="step-num">04</div>
+          <div class="step-title"><span class="stage">Adjust</span>Tune Land : Sea</div>
+          <div class="chevron">▸</div>
+        </div>
+        <div class="step-body">
+          <div class="step-body-inner">
+            <label class="field">Groove Width Adjustment</label>
+            <div class="row">
+              <input type="range" id="tuneSlider" min="-8" max="8" value="0">
+              <div class="val-badge" id="tuneVal">0</div>
+            </div>
+            <div class="hint">Negative narrows grooves (less sea, more land). Positive widens grooves (more sea, less land). Re-analyzed live against target.</div>
+            <div class="btn-row" style="margin-top:12px;">
+              <button class="btn" onclick="autoTune()">Auto-tune to target</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step" data-step="5">
+        <div class="step-head" onclick="setActiveStep(5)">
+          <div class="step-num">05</div>
+          <div class="step-title"><span class="stage">Generate</span>Multipitch Scaling</div>
+          <div class="chevron">▸</div>
+        </div>
+        <div class="step-body">
+          <div class="step-body-inner">
+            <label class="field">Pitch Scheme</label>
+            <select id="pitchScheme" onchange="renderMultipitch()">
+              <option value="5">5-Pitch — 0.90 / 0.95 / 1.00 / 1.10 / 1.20</option>
+              <option value="3">3-Pitch — 0.90 / 1.00 / 1.15</option>
+              <option value="7">7-Pitch — Randomized ±20%</option>
+            </select>
+            <div class="btn-row" style="margin-top:12px;">
+              <button class="btn primary" id="proceedBtn" onclick="goToMultipitch()" disabled>Proceed to Multipitch Scaling</button>
+            </div>
+            <div class="btn-row" style="margin-top:8px;">
+              <button class="btn ghost" onclick="shuffleSequence()">Shuffle pitch order</button>
+            </div>
+            <div class="hint" id="mpHint">Land:Sea must be within tolerance (Step 03) before proceeding.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step" data-step="6">
+        <div class="step-head" onclick="setActiveStep(6)">
+          <div class="step-num">06</div>
+          <div class="step-title"><span class="stage">Output</span>Finish &amp; Export</div>
+          <div class="chevron">▸</div>
+        </div>
+        <div class="step-body">
+          <div class="step-body-inner">
+            <div class="btn-row">
+              <button class="btn" onclick="exportPNG()">Export Bitmap (.png)</button>
+            </div>
+            <div class="btn-row" style="margin-top:8px;">
+              <button class="btn" onclick="exportJSON()">Export Report (.json)</button>
+            </div>
+            <div class="hint">Bitmap export mirrors the O/P spec (CAD file + bitmap image). Native <b style="color:var(--text-dim)">.dwg</b> round-trip requires CAD-API integration in the production build — out of scope for this prototype.</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ================= RIGHT: MAIN PANEL ================= -->
+    <div class="main">
+      <div class="main-tabs">
+        <div class="tab active" id="tabPattern" onclick="switchView('pattern')">Pattern Analysis</div>
+        <div class="tab" id="tabMulti" onclick="switchView('multi')">Multipitch Output</div>
+      </div>
+
+      <div class="main-canvas-wrap">
+
+        <div class="view-panel show" id="viewPattern">
+          <canvas id="patternCanvas" width="300" height="160"></canvas>
+          <div class="legend">
+            <span><i class="swatch" style="background:var(--land);"></i>Land (rubber)</span>
+            <span><i class="swatch" style="background:var(--cyan);"></i>Sea (groove)</span>
+          </div>
+          <div class="gauge-wrap">
+            <svg id="gaugeSvg" width="180" height="110" viewBox="0 0 180 110"></svg>
+            <div class="gauge-readings">
+              <div class="big mono" id="gaugeBig">—%</div>
+              <div class="lbl">Current void ratio</div>
+              <div id="gaugeStatus" style="margin-top:10px;"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="view-panel" id="viewMulti">
+          <canvas id="multipitchCanvas" width="1000" height="260"></canvas>
+          <div class="legend">
+            <span><i class="swatch" style="background:var(--purple);"></i>Reference pitch (×1.00)</span>
+            <span><i class="swatch" style="background:var(--cyan);"></i>Scaled pitch</span>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="readout-strip">
+        <div class="readout">
+          <div class="rlabel">Void Ratio (Sea)</div>
+          <div class="rval cyan" id="roSea">—%</div>
+        </div>
+        <div class="readout">
+          <div class="rlabel">Land Ratio</div>
+          <div class="rval purple" id="roLand">—%</div>
+        </div>
+        <div class="readout">
+          <div class="rlabel">Delta vs Target</div>
+          <div class="rval" id="roDelta">—</div>
+        </div>
+        <div class="readout">
+          <div class="rlabel">Pitch Count</div>
+          <div class="rval" id="roPitch">5</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <footer class="note">
+    <b>Prototype scope:</b> demonstrates the full pipeline from Slide 3 — Tread Pattern Drawing → Feature Identification → Land:Sea Analysis → Tune loop → Multipitch Scaling → Export — using client-side pixel analysis in place of a CAD engine. Threshold and morphological width adjustment stand in for true vector groove-geometry edits; production version binds to AutoCAD via its API for direct DWG read/write.
+  </footer>
+
+</div>
+
+<script>
+const AW = 300, AH = 160; // analysis resolution
+let sourceCanvas = document.createElement('canvas');
+sourceCanvas.width = AW; sourceCanvas.height = AH;
+let sourceCtx = sourceCanvas.getContext('2d');
+
+let baseMask = null;     // Uint8Array AW*AH, 1 = sea
+let tunedMask = null;
+let pitchSequence = [0.90, 0.95, 1.00, 1.10, 1.20];
+let refIndex = 2;
+
+const patternCanvas = document.getElementById('patternCanvas');
+const pctx = patternCanvas.getContext('2d');
+const multiCanvas = document.getElementById('multipitchCanvas');
+const mctx = multiCanvas.getContext('2d');
+
+// ---------- COLORS (match CSS tokens) ----------
+const COL_LAND = '#CDC5DE';
+const COL_SEA  = '#04070A';
+const COL_SEA_DISPLAY = '#0A2A2E'; // land canvas sea fill tinted cyan-dark for legibility
+const COL_CYAN = '#4FD8E0';
+const COL_PURPLE = '#9184EE';
+
+// ================= SAMPLE PATTERN GENERATION =================
+function drawSyntheticPattern(ctx){
+  ctx.fillStyle = '#EDE9F5';
+  ctx.fillRect(0,0,AW,AH);
+  ctx.fillStyle = '#050505';
+  // chevron main groove
+  ctx.beginPath();
+  ctx.moveTo(0, AH*0.30); ctx.lineTo(AW*0.5, AH*0.62); ctx.lineTo(AW, AH*0.30);
+  ctx.lineTo(AW, AH*0.42); ctx.lineTo(AW*0.5, AH*0.76); ctx.lineTo(0, AH*0.42);
+  ctx.closePath(); ctx.fill();
+
+  // secondary chevron groove
+  ctx.beginPath();
+  ctx.moveTo(0, AH*0.78); ctx.lineTo(AW*0.5, AH*0.98); ctx.lineTo(AW, AH*0.78);
+  ctx.lineTo(AW, AH*0.86); ctx.lineTo(AW*0.5, AH*1.04); ctx.lineTo(0, AH*0.86);
+  ctx.closePath(); ctx.fill();
+
+  // lateral slits (sipes) across land area, deterministic spacing
+  for(let x=14; x<AW-10; x+=22){
+    let h = 12 + (x % 3)*4;
+    let y = AH*0.10;
+    ctx.fillRect(x, y, 5, h);
+    let y2 = AH*0.52;
+    ctx.fillRect(x+8, y2, 4, 9);
+  }
+  // outer shoulder grooves
+  ctx.fillRect(0, 0, 6, AH);
+  ctx.fillRect(AW-6, 0, 6, AH);
+}
+
+function loadSample(){
+  drawSyntheticPattern(sourceCtx);
+  document.getElementById('dzLabel').textContent = 'Synthetic sample loaded';
+  document.getElementById('dropzone').classList.add('has-file');
+  runPipeline();
+  setActiveStep(2);
+}
+
+// ================= FILE UPLOAD =================
+document.getElementById('fileInput').addEventListener('change', (e)=>{
+  const f = e.target.files[0];
+  if(!f) return;
+  const img = new Image();
+  img.onload = ()=>{
+    sourceCtx.fillStyle = '#000';
+    sourceCtx.fillRect(0,0,AW,AH);
+    // cover-fit
+    const scale = Math.max(AW/img.width, AH/img.height);
+    const dw = img.width*scale, dh = img.height*scale;
+    sourceCtx.drawImage(img, (AW-dw)/2, (AH-dh)/2, dw, dh);
+    document.getElementById('dzLabel').textContent = f.name;
+    document.getElementById('dropzone').classList.add('has-file');
+    runPipeline();
+    setActiveStep(2);
+  };
+  img.src = URL.createObjectURL(f);
+});
+document.getElementById('dropzone').addEventListener('dragover', e=>{e.preventDefault();});
+document.getElementById('dropzone').addEventListener('drop', e=>{
+  e.preventDefault();
+  const f = e.dataTransfer.files[0];
+  if(f){ document.getElementById('fileInput').files = e.dataTransfer.files; document.getElementById('fileInput').dispatchEvent(new Event('change')); }
+});
+
+// ================= FEATURE DETECTION (threshold) =================
+function computeBaseMask(threshold){
+  const data = sourceCtx.getImageData(0,0,AW,AH).data;
+  const mask = new Uint8Array(AW*AH);
+  for(let i=0;i<AW*AH;i++){
+    const r=data[i*4], g=data[i*4+1], b=data[i*4+2];
+    const lum = 0.299*r + 0.587*g + 0.114*b;
+    mask[i] = lum < threshold ? 1 : 0; // 1 = sea
+  }
+  return mask;
+}
+
+// ================= MORPHOLOGICAL TUNE =================
+function morph(mask, iterations){
+  let cur = mask.slice();
+  const grow = iterations > 0;
+  const n = Math.abs(iterations);
+  for(let it=0; it<n; it++){
+    const next = cur.slice();
+    for(let y=0;y<AH;y++){
+      for(let x=0;x<AW;x++){
+        const idx = y*AW+x;
+        if(grow){
+          if(cur[idx]===1) continue;
+          if(hasNeighbor(cur,x,y,1)) next[idx]=1;
+        } else {
+          if(cur[idx]===0) continue;
+          if(hasNeighbor(cur,x,y,0)) next[idx]=0;
+        }
+      }
+    }
+    cur = next;
+  }
+  return cur;
+}
+function hasNeighbor(mask,x,y,val){
+  const dirs=[[1,0],[-1,0],[0,1],[0,-1]];
+  for(const [dx,dy] of dirs){
+    const nx=x+dx, ny=y+dy;
+    if(nx<0||ny<0||nx>=AW||ny>=AH) continue;
+    if(mask[ny*AW+nx]===val) return true;
+  }
+  return false;
+}
+
+// ================= RENDER PATTERN CANVAS =================
+function renderPattern(mask){
+  const imgData = pctx.createImageData(AW,AH);
+  const landRGB = hexToRgb(COL_LAND);
+  const seaRGB = hexToRgb(COL_SEA_DISPLAY);
+  for(let i=0;i<AW*AH;i++){
+    const isSea = mask[i]===1;
+    const c = isSea ? seaRGB : landRGB;
+    imgData.data[i*4]=c[0]; imgData.data[i*4+1]=c[1]; imgData.data[i*4+2]=c[2]; imgData.data[i*4+3]=255;
+  }
+  pctx.putImageData(imgData,0,0);
+  // groove edge tint
+  pctx.globalCompositeOperation='source-atop';
+  pctx.fillStyle='rgba(79,216,224,0.10)';
+  pctx.fillRect(0,0,AW,AH);
+  pctx.globalCompositeOperation='source-over';
+}
+function hexToRgb(hex){
+  const v = hex.replace('#','');
+  return [parseInt(v.substr(0,2),16), parseInt(v.substr(2,2),16), parseInt(v.substr(4,2),16)];
+}
+
+// ================= ANALYSIS / STATUS =================
+function ratioOf(mask){
+  let sea=0;
+  for(let i=0;i<mask.length;i++) sea+=mask[i];
+  const seaPct = (sea/mask.length)*100;
+  return {seaPct, landPct: 100-seaPct};
+}
+
+function runPipeline(){
+  const threshold = +document.getElementById('thresholdSlider').value;
+  const tune = +document.getElementById('tuneSlider').value;
+  baseMask = computeBaseMask(threshold);
+  tunedMask = tune===0 ? baseMask.slice() : morph(baseMask, tune);
+  renderPattern(tunedMask);
+  updateReadouts();
+  drawGauge();
+}
+
+function updateReadouts(){
+  const {seaPct, landPct} = ratioOf(tunedMask);
+  const target = +document.getElementById('targetVoid').value;
+  const tol = +document.getElementById('tolerance').value;
+  const delta = seaPct - target;
+  const ok = Math.abs(delta) <= tol;
+
+  document.getElementById('roSea').textContent = seaPct.toFixed(1)+'%';
+  document.getElementById('roLand').textContent = landPct.toFixed(1)+'%';
+  document.getElementById('roDelta').textContent = (delta>=0?'+':'')+delta.toFixed(1)+'%';
+  document.getElementById('roDelta').className = 'rval ' + (ok ? 'ok' : 'warn');
+
+  document.getElementById('gaugeBig').textContent = seaPct.toFixed(1)+'%';
+  const statusHTML = ok
+    ? '<span class="status-pill ok"><i class="dot"></i>WITHIN TOLERANCE — OK</span>'
+    : '<span class="status-pill warn"><i class="dot"></i>'+(delta>0?'ABOVE':'BELOW')+' TARGET — TUNE NEEDED</span>';
+  document.getElementById('gaugeStatus').innerHTML = statusHTML;
+  document.getElementById('statusRow').innerHTML = '<div style="margin-top:8px;">'+statusHTML+'</div>';
+
+  const proceedBtn = document.getElementById('proceedBtn');
+  proceedBtn.disabled = !ok;
+  document.getElementById('mpHint').textContent = ok
+    ? 'Land:Sea within tolerance — ready to scale.'
+    : 'Land:Sea must be within tolerance (Step 03) before proceeding.';
+
+  // mark steps done
+  document.querySelector('.step[data-step="2"]').classList.add('done');
+  document.querySelector('.step[data-step="3"]').classList.toggle('done', ok);
+  document.querySelector('.step[data-step="4"]').classList.toggle('done', ok);
+}
+
+// ================= GAUGE (SVG) =================
+function polar(cx,cy,r,angleDeg){
+  const rad = angleDeg*Math.PI/180;
+  return {x: cx + r*Math.cos(rad), y: cy - r*Math.sin(rad)};
+}
+function angleFor(value, maxScale){
+  const v = Math.max(0, Math.min(maxScale, value));
+  return 180 - (v/maxScale)*180;
+}
+function drawGauge(){
+  const svg = document.getElementById('gaugeSvg');
+  const cx=90, cy=95, r=72, maxScale=55;
+  const {seaPct} = ratioOf(tunedMask);
+  const target = +document.getElementById('targetVoid').value;
+  const tol = +document.getElementById('tolerance').value;
+
+  const start = polar(cx,cy,r,180);
+  const end = polar(cx,cy,r,0);
+  const tolStart = polar(cx,cy,r, angleFor(Math.max(0,target-tol), maxScale));
+  const tolEnd = polar(cx,cy,r, angleFor(Math.min(maxScale,target+tol), maxScale));
+  const needleAngle = angleFor(seaPct, maxScale);
+  const needleTip = polar(cx,cy,r-14,needleAngle);
+  const targetTick1 = polar(cx,cy,r+6, angleFor(target,maxScale));
+  const targetTick2 = polar(cx,cy,r-6, angleFor(target,maxScale));
+
+  let ticks='';
+  for(let t=0;t<=maxScale;t+=10){
+    const p1 = polar(cx,cy,r+3, angleFor(t,maxScale));
+    const p2 = polar(cx,cy,r+10, angleFor(t,maxScale));
+    const lbl = polar(cx,cy,r+20, angleFor(t,maxScale));
+    ticks += `<line x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}" stroke="#3A424C" stroke-width="1.5"/>`;
+    ticks += `<text x="${lbl.x}" y="${lbl.y}" fill="#525C67" font-size="8" font-family="IBM Plex Mono" text-anchor="middle" dominant-baseline="middle">${t}</text>`;
+  }
+
+  svg.innerHTML = `
+    <path d="M ${start.x} ${start.y} A ${r} ${r} 0 0 1 ${end.x} ${end.y}" stroke="#252C34" stroke-width="8" fill="none" stroke-linecap="round"/>
+    <path d="M ${tolStart.x} ${tolStart.y} A ${r} ${r} 0 0 1 ${tolEnd.x} ${tolEnd.y}" stroke="#39D98A" stroke-opacity="0.55" stroke-width="8" fill="none"/>
+    ${ticks}
+    <line x1="${targetTick1.x}" y1="${targetTick1.y}" x2="${targetTick2.x}" y2="${targetTick2.y}" stroke="#F4B740" stroke-width="2"/>
+    <line x1="${cx}" y1="${cy}" x2="${needleTip.x}" y2="${needleTip.y}" stroke="#4FD8E0" stroke-width="2.5" stroke-linecap="round"/>
+    <circle cx="${cx}" cy="${cy}" r="4.5" fill="#4FD8E0"/>
+  `;
+}
+
+// ================= EVENT WIRES =================
+document.getElementById('thresholdSlider').addEventListener('input', e=>{
+  document.getElementById('thresholdVal').textContent = e.target.value;
+  runPipeline();
+});
+document.getElementById('tuneSlider').addEventListener('input', e=>{
+  document.getElementById('tuneVal').textContent = e.target.value;
+  runPipeline();
+});
+document.getElementById('targetVoid').addEventListener('input', ()=>{ updateReadouts(); drawGauge(); });
+document.getElementById('tolerance').addEventListener('input', ()=>{ updateReadouts(); drawGauge(); });
+
+function autoTune(){
+  const target = +document.getElementById('targetVoid').value;
+  let bestTune = 0, bestDiff = Infinity;
+  for(let t=-8; t<=8; t++){
+    const m = t===0 ? baseMask.slice() : morph(baseMask, t);
+    const {seaPct} = ratioOf(m);
+    const diff = Math.abs(seaPct - target);
+    if(diff < bestDiff){ bestDiff = diff; bestTune = t; }
+  }
+  document.getElementById('tuneSlider').value = bestTune;
+  document.getElementById('tuneVal').textContent = bestTune;
+  runPipeline();
+  setActiveStep(4);
+}
+
+// ================= STEPPER UI =================
+function setActiveStep(n){
+  document.querySelectorAll('.step').forEach(s=>{
+    s.classList.toggle('active', +s.dataset.step === n);
+  });
+}
+
+// ================= MULTIPITCH =================
+function buildSequence(scheme){
+  if(scheme==='3') return {seq:[0.90,1.00,1.15], ref:1};
+  if(scheme==='7'){
+    const seq=[];
+    for(let i=0;i<7;i++){ seq.push(+(0.82 + Math.random()*0.36).toFixed(2)); }
+    seq[3]=1.00;
+    return {seq, ref:3};
+  }
+  return {seq:[0.90,0.95,1.00,1.10,1.20], ref:2};
+}
+
+function goToMultipitch(){
+  const scheme = document.getElementById('pitchScheme').value;
+  const built = buildSequence(scheme);
+  pitchSequence = built.seq; refIndex = built.ref;
+  switchView('multi');
+  setActiveStep(6);
+  renderMultipitch();
+}
+
+function shuffleSequence(){
+  const refVal = pitchSequence[refIndex];
+  const rest = pitchSequence.filter((_,i)=>i!==refIndex);
+  for(let i=rest.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1));
+    [rest[i],rest[j]]=[rest[j],rest[i]];
+  }
+  const mid = Math.floor(rest.length/2);
+  pitchSequence = [...rest.slice(0,mid), refVal, ...rest.slice(mid)];
+  refIndex = mid;
+  renderMultipitch();
+}
+
+function renderMultipitch(){
+  const scheme = document.getElementById('pitchScheme').value;
+  if(!tunedMask){ return; }
+  if(document.getElementById('viewMulti').classList.contains('show') === false && pitchSequence.length===0){
+    const built = buildSequence(scheme); pitchSequence=built.seq; refIndex=built.ref;
+  }
+  document.getElementById('roPitch').textContent = pitchSequence.length;
+
+  const baseTileW = 130, tileH = 190, gap = 14, marginTop = 46, marginBottom = 40;
+  let totalW = 20;
+  pitchSequence.forEach(m=> totalW += baseTileW*m + gap);
+  multiCanvas.width = Math.max(totalW, 600);
+  multiCanvas.height = marginTop + tileH + marginBottom;
+
+  mctx.fillStyle = '#0A0C0F';
+  mctx.fillRect(0,0,multiCanvas.width, multiCanvas.height);
+
+  // render tuned tile once to an offscreen canvas
+  const tileSrc = document.createElement('canvas');
+  tileSrc.width = AW; tileSrc.height = AH;
+  const tctx = tileSrc.getContext('2d');
+  const imgData = tctx.createImageData(AW,AH);
+  const landRGB = hexToRgb(COL_LAND), seaRGB = hexToRgb(COL_SEA);
+  for(let i=0;i<AW*AH;i++){
+    const c = tunedMask[i]===1 ? seaRGB : landRGB;
+    imgData.data[i*4]=c[0]; imgData.data[i*4+1]=c[1]; imgData.data[i*4+2]=c[2]; imgData.data[i*4+3]=255;
+  }
+  tctx.putImageData(imgData,0,0);
+
+  let x = 10;
+  pitchSequence.forEach((m,i)=>{
+    const w = baseTileW*m;
+    const isRef = i===refIndex;
+    mctx.imageSmoothingEnabled = true;
+    mctx.drawImage(tileSrc, x, marginTop, w, tileH);
+
+    mctx.strokeStyle = isRef ? '#9184EE' : 'rgba(255,255,255,0.12)';
+    mctx.lineWidth = isRef ? 2.5 : 1;
+    mctx.strokeRect(x, marginTop, w, tileH);
+
+    // dimension line below
+    const dimY = marginTop + tileH + 14;
+    mctx.strokeStyle = '#3A424C'; mctx.lineWidth=1;
+    mctx.beginPath(); mctx.moveTo(x, dimY); mctx.lineTo(x+w, dimY); mctx.stroke();
+    mctx.beginPath(); mctx.moveTo(x, dimY-4); mctx.lineTo(x, dimY+4); mctx.stroke();
+    mctx.beginPath(); mctx.moveTo(x+w, dimY-4); mctx.lineTo(x+w, dimY+4); mctx.stroke();
+
+    // label above
+    mctx.fillStyle = isRef ? '#9184EE' : '#4FD8E0';
+    mctx.font = '600 12px IBM Plex Mono, monospace';
+    mctx.textAlign = 'center';
+    mctx.fillText('P'+(i+1), x+w/2, marginTop-24);
+    mctx.fillStyle = '#8A94A0';
+    mctx.font = '11px IBM Plex Mono, monospace';
+    mctx.fillText(isRef ? 'REF ×1.00' : ('×'+m.toFixed(2)), x+w/2, marginTop-10);
+
+    x += w + gap;
+  });
+
+  const total = x - gap + 10;
+  mctx.fillStyle = '#525C67';
+  mctx.font = '10px IBM Plex Mono, monospace';
+  mctx.textAlign = 'left';
+  mctx.fillText('TOTAL WIDTH: ' + Math.round(total) + ' units   |   PITCHES: ' + pitchSequence.length + '   |   SCHEME: ' + (scheme==='7'?'RANDOMIZED 7-PITCH':scheme+'-PITCH'), 10, multiCanvas.height-14);
+}
+
+// ================= VIEW SWITCH =================
+function switchView(v){
+  document.getElementById('tabPattern').classList.toggle('active', v==='pattern');
+  document.getElementById('tabMulti').classList.toggle('active', v==='multi');
+  document.getElementById('viewPattern').classList.toggle('show', v==='pattern');
+  document.getElementById('viewMulti').classList.toggle('show', v==='multi');
+  if(v==='multi') renderMultipitch();
+}
+
+// ================= EXPORT =================
+function exportPNG(){
+  const canvas = document.getElementById('viewMulti').classList.contains('show') ? multiCanvas : patternCanvas;
+  const link = document.createElement('a');
+  link.download = 'treadtune_export.png';
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+}
+function exportJSON(){
+  const {seaPct, landPct} = ratioOf(tunedMask || new Uint8Array(1));
+  const report = {
+    project: 'Automated Tyre Tread Pattern Tuning',
+    timestamp: new Date().toISOString(),
+    detection_threshold: +document.getElementById('thresholdSlider').value,
+    tune_adjustment: +document.getElementById('tuneSlider').value,
+    void_ratio_target_pct: +document.getElementById('targetVoid').value,
+    tolerance_pct: +document.getElementById('tolerance').value,
+    void_ratio_actual_pct: +seaPct.toFixed(2),
+    land_ratio_actual_pct: +landPct.toFixed(2),
+    pitch_scheme: document.getElementById('pitchScheme').value,
+    pitch_sequence: pitchSequence,
+    reference_pitch_index: refIndex+1
+  };
+  const blob = new Blob([JSON.stringify(report,null,2)], {type:'application/json'});
+  const link = document.createElement('a');
+  link.download = 'treadtune_report.json';
+  link.href = URL.createObjectURL(blob);
+  link.click();
+}
+
+// ================= INIT =================
+loadSample();
+document.querySelector('.step[data-step="1"]').classList.add('done');
+</script>
+</body>
+</html>
